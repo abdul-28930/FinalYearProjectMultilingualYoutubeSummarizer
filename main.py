@@ -1,6 +1,6 @@
 import re
 import os
-import yt_dlp as youtube_dl  # Using yt-dlp for downloading
+import yt_dlp as youtube_dl
 import whisper
 
 def is_valid_url(url):
@@ -17,6 +17,7 @@ def download_youtube_audio(url, output_filename="output.mp3"):
 
         # Set the full output path
         output_path = os.path.join(folder_path, output_filename)
+        print(f"Output path: {output_path}")  # Debugging output
 
         # Define options for yt-dlp
         ydl_opts = {
@@ -33,8 +34,13 @@ def download_youtube_audio(url, output_filename="output.mp3"):
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        print(f"Audio saved to {output_path}")
-        return output_path  # Return the path of the downloaded audio
+        # Check if the file exists after downloading
+        if os.path.isfile(output_path):
+            print(f"Audio successfully downloaded and saved to {output_path}")
+            return output_path
+        else:
+            print("Failed to find the downloaded audio file.")
+            return None
         
     except youtube_dl.utils.DownloadError:
         print("Failed to download the video. The URL might be invalid or the video is unavailable.")
@@ -42,27 +48,36 @@ def download_youtube_audio(url, output_filename="output.mp3"):
         print(f"An error occurred: {e}")
 
 def transcribe_audio(audio_path):
+    # Check if the audio file exists
+    if not os.path.isfile(audio_path):
+        print(f"Audio file not found: {audio_path}")
+        return
+
     # Load Whisper model
     model = whisper.load_model("base")
 
-    # Load audio and pad/trim it to fit 30 seconds
-    audio = whisper.load_audio(audio_path)
-    audio = whisper.pad_or_trim(audio)
+    try:
+        # Load audio and pad/trim it
+        audio = whisper.load_audio(audio_path)
+        audio = whisper.pad_or_trim(audio)
 
-    # Make log-Mel spectrogram and move to the same device as the model
-    mel = whisper.log_mel_spectrogram(audio).to(model.device)
+        # Make log-Mel spectrogram and move to the same device as the model
+        mel = whisper.log_mel_spectrogram(audio).to(model.device)
 
-    # Detect the spoken language
-    _, probs = model.detect_language(mel)
-    print(f"Detected language: {max(probs, key=probs.get)}")
+        # Detect the spoken language
+        _, probs = model.detect_language(mel)
+        print(f"Detected language: {max(probs, key=probs.get)}")
 
-    # Decode the audio
-    options = whisper.DecodingOptions()
-    result = whisper.decode(model, mel, options)
+        # Decode the audio
+        options = whisper.DecodingOptions()
+        result = whisper.decode(model, mel, options)
 
-    # Print the recognized text
-    print("Transcription:")
-    print(result.text)
+        # Print the recognized text
+        print("Transcription:")
+        print(result.text)
+
+    except Exception as e:
+        print(f"An error occurred during transcription: {e}")
 
 if __name__ == "__main__":
     video_url = input("Enter the YouTube video URL: ")
